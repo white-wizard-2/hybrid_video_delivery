@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -88,6 +91,11 @@ func (s *Server) setupRoutes() {
 		// Configuration routes
 		api.GET("/config", s.getConfig)
 		api.PUT("/config", s.updateConfig)
+
+		// Video streaming routes
+		api.GET("/video/origin", s.streamOriginVideo)
+		api.GET("/video/cdn", s.streamCDNVideo)
+		api.GET("/video/proxy", s.streamProxyVideo)
 	}
 
 	// WebSocket for real-time logs
@@ -311,6 +319,92 @@ func (s *Server) updateConfig(c *gin.Context) {
 	s.proxyService.UpdateConfig(config)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Configuration updated successfully"})
+}
+
+// streamOriginVideo streams the origin video chunks
+func (s *Server) streamOriginVideo(c *gin.Context) {
+	log.Printf("Streaming origin video from chunks")
+	c.Header("Content-Type", "video/mp4")
+	c.Header("Accept-Ranges", "bytes")
+	c.Header("Cache-Control", "no-cache")
+
+	// Serve the most recent chunk from origin folder
+	chunkPath := s.getLatestChunk("origin")
+	if chunkPath != "" {
+		log.Printf("Serving origin chunk: %s", chunkPath)
+		c.File(chunkPath)
+	} else {
+		log.Printf("No origin chunks found - returning 404")
+		c.Status(http.StatusNotFound)
+		c.String(http.StatusNotFound, "No video chunks available")
+	}
+}
+
+// streamCDNVideo streams the CDN video chunks
+func (s *Server) streamCDNVideo(c *gin.Context) {
+	log.Printf("Streaming CDN video from chunks")
+	c.Header("Content-Type", "video/mp4")
+	c.Header("Accept-Ranges", "bytes")
+	c.Header("Cache-Control", "no-cache")
+
+	// Serve the most recent chunk from cdn_output folder
+	chunkPath := s.getLatestChunk("cdn_output")
+	if chunkPath != "" {
+		log.Printf("Serving CDN chunk: %s", chunkPath)
+		c.File(chunkPath)
+	} else {
+		log.Printf("No CDN chunks found - returning 404")
+		c.Status(http.StatusNotFound)
+		c.String(http.StatusNotFound, "No video chunks available")
+	}
+}
+
+// streamProxyVideo streams the Proxy video chunks
+func (s *Server) streamProxyVideo(c *gin.Context) {
+	log.Printf("Streaming Proxy video from chunks")
+	c.Header("Content-Type", "video/mp4")
+	c.Header("Accept-Ranges", "bytes")
+	c.Header("Cache-Control", "no-cache")
+
+	// Serve the most recent chunk from proxy_output folder
+	chunkPath := s.getLatestChunk("proxy_output")
+	if chunkPath != "" {
+		log.Printf("Serving Proxy chunk: %s", chunkPath)
+		c.File(chunkPath)
+	} else {
+		log.Printf("No Proxy chunks found - returning 404")
+		c.Status(http.StatusNotFound)
+		c.String(http.StatusNotFound, "No video chunks available")
+	}
+}
+
+// getLatestChunk returns the path to the most recent chunk file in the specified folder
+func (s *Server) getLatestChunk(folder string) string {
+	entries, err := os.ReadDir(folder)
+	if err != nil {
+		log.Printf("Error reading directory %s: %v", folder, err)
+		return ""
+	}
+
+	var latestFile string
+	var latestTime time.Time
+
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".m4s") {
+			filePath := filepath.Join(folder, entry.Name())
+			info, err := entry.Info()
+			if err != nil {
+				continue
+			}
+
+			if info.ModTime().After(latestTime) {
+				latestTime = info.ModTime()
+				latestFile = filePath
+			}
+		}
+	}
+
+	return latestFile
 }
 
 // CMAF Manifest Handlers

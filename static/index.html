@@ -129,6 +129,39 @@
             </div>
         </div>
 
+        <!-- Video Streams -->
+        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+            <h3 class="text-lg font-semibold mb-4 text-gray-800">Live Video Streams</h3>
+            <div class="grid grid-cols-3 gap-4">
+                <!-- Origin Stream -->
+                <div class="text-center">
+                    <h4 class="text-sm font-medium text-gray-700 mb-2">Origin Stream</h4>
+                    <video id="originVideo" class="w-full h-32 bg-gray-100 rounded-lg" controls autoplay muted loop>
+                        <source src="/api/video/origin" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+                
+                <!-- CDN Stream -->
+                <div class="text-center">
+                    <h4 class="text-sm font-medium text-gray-700 mb-2">CDN Stream</h4>
+                    <video id="cdnVideo" class="w-full h-32 bg-gray-100 rounded-lg" controls autoplay muted loop>
+                        <source src="/api/video/cdn" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+                
+                <!-- Proxy Stream -->
+                <div class="text-center">
+                    <h4 class="text-sm font-medium text-gray-700 mb-2">Proxy Stream (5G + FLUTE)</h4>
+                    <video id="proxyVideo" class="w-full h-32 bg-gray-100 rounded-lg" controls autoplay muted loop>
+                        <source src="/api/video/proxy" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+            </div>
+        </div>
+
         <!-- Statistics Comparison -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
             <!-- CDN Stats -->
@@ -376,6 +409,7 @@
                     this.loadData();
                     this.loadStats();
                     this.connectWebSocket();
+                    this.initializeVideoStreams(); // Initialize video stream listeners
                     // Refresh data every 2 seconds
                     setInterval(() => {
                         this.loadData();
@@ -527,6 +561,33 @@
                             enabled: this.packetDropConfig.enabled,
                             dropRate: this.packetDropConfig.dropRate
                         }));
+                    },
+                    
+                    // Video stream handling
+                    initializeVideoStreams() {
+                        const videos = ['originVideo', 'cdnVideo', 'proxyVideo'];
+                        videos.forEach(videoId => {
+                            const video = document.getElementById(videoId);
+                            if (video) {
+                                video.addEventListener('loadstart', () => {
+                                    console.log(`${videoId} started loading`);
+                                });
+                                
+                                video.addEventListener('canplay', () => {
+                                    console.log(`${videoId} can play`);
+                                    video.style.border = '2px solid #10B981'; // Green border when ready
+                                });
+                                
+                                video.addEventListener('error', (e) => {
+                                    console.error(`${videoId} error:`, e);
+                                    video.style.border = '2px solid #EF4444'; // Red border on error
+                                });
+                                
+                                video.addEventListener('waiting', () => {
+                                    video.style.border = '2px solid #F59E0B'; // Yellow border when buffering
+                                });
+                            }
+                        });
                     }
                 }
             }).mount('#app');
