@@ -306,17 +306,17 @@ func (s *ProxyService) GetStats() common.ProxyStats {
 	// Use real metrics calculations
 	latency := s.metrics.GetLatency()
 	if latency == 0 {
-		latency = 20 // Fallback to simulated value if no data yet
+		latency = 0 // Fallback to simulated value if no data yet
 	}
 
 	totalBandwidth := s.metrics.GetTotalBandwidth()
 	if totalBandwidth == 0 {
-		totalBandwidth = 200 // Fallback to simulated value if no data yet
+		totalBandwidth = 0 // Fallback to simulated value if no data yet
 	}
 
 	packetLoss := s.metrics.GetPacketLoss()
 	if packetLoss == 0 {
-		packetLoss = 2.0 // Fallback to simulated value if no data yet
+		packetLoss = 0 // Fallback to simulated value if no data yet
 	}
 
 	// Get unicast and broadcast bandwidth

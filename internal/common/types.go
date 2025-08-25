@@ -29,6 +29,11 @@ type ServiceStats struct {
 	Latency     int     `json:"latency"`    // in milliseconds
 	PacketLoss  float64 `json:"packetLoss"` // percentage
 	Bandwidth   int     `json:"bandwidth"`  // in Mbps
+	// Additional CDN statistics
+	UnicastBytes uint64  `json:"unicastBytes"` // total bytes transferred
+	TotalChunks  uint64  `json:"totalChunks"`  // total chunks delivered
+	AvgChunkSize int     `json:"avgChunkSize"` // average chunk size in bytes
+	RecoveryRate float64 `json:"recoveryRate"` // packet recovery rate percentage
 }
 
 // ProxyStats represents detailed statistics for Proxy service with unicast/broadcast split

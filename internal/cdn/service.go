@@ -229,25 +229,35 @@ func (s *CDNService) GetStats() common.ServiceStats {
 	// Use real metrics calculations
 	latency := s.metrics.GetLatency()
 	if latency == 0 {
-		latency = 50 // Fallback to simulated value if no data yet
+		latency = 0 // Fallback to simulated value if no data yet
 	}
 
 	bandwidth := s.metrics.GetBandwidth()
 	if bandwidth == 0 {
-		bandwidth = 100 // Fallback to simulated value if no data yet
+		bandwidth = 0 // Fallback to simulated value if no data yet
 	}
 
 	packetLoss := s.metrics.GetPacketLoss()
 	if packetLoss == 0 {
-		packetLoss = 0.1 // Fallback to simulated value if no data yet
+		packetLoss = 0 // Fallback to simulated value if no data yet
 	}
 
+	// Get additional metrics
+	unicastBytes := s.metrics.GetTotalBytes()
+	totalChunks := s.metrics.GetTotalChunks()
+	avgChunkSize := s.metrics.GetAverageChunkSize()
+	recoveryRate := s.metrics.GetRecoveryRate()
+
 	return common.ServiceStats{
-		Type:        "CDN",
-		NodeCount:   len(s.nodes),
-		ClientCount: totalClients,
-		Latency:     int(latency),
-		PacketLoss:  packetLoss,
-		Bandwidth:   int(bandwidth),
+		Type:         "CDN",
+		NodeCount:    len(s.nodes),
+		ClientCount:  totalClients,
+		Latency:      int(latency),
+		PacketLoss:   packetLoss,
+		Bandwidth:    int(bandwidth),
+		UnicastBytes: unicastBytes,
+		TotalChunks:  totalChunks,
+		AvgChunkSize: avgChunkSize,
+		RecoveryRate: recoveryRate,
 	}
 }
