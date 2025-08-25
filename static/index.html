@@ -116,7 +116,7 @@
                     <label class="block text-sm font-medium text-gray-700 mb-2">
                         Packet Drop Rate: {{ packetDropConfig.dropRate }}%
                     </label>
-                    <input type="range" v-model="packetDropConfig.dropRate" min="0" max="50" step="1" 
+                    <input type="range" v-model.number="packetDropConfig.dropRate" min="0" max="50" step="1" 
                            @input="updatePacketDropConfig"
                            class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider">
                 </div>
@@ -408,6 +408,7 @@
                     console.log('Vue app mounted');
                     this.loadData();
                     this.loadStats();
+                    this.loadConfig(); // Load current configuration
                     this.connectWebSocket();
                     this.initializeVideoStreams(); // Initialize video stream listeners
                     // Refresh data every 2 seconds
@@ -448,6 +449,17 @@
                             console.log('Stats loaded:', cdnStats, proxyStats);
                         } catch (error) {
                             console.error('Failed to load stats:', error);
+                        }
+                    },
+                    async loadConfig() {
+                        try {
+                            const response = await fetch('/api/config');
+                            const config = await response.json();
+                            this.packetDropConfig.enabled = config.packetDrop.enabled;
+                            this.packetDropConfig.dropRate = config.packetDrop.dropRate;
+                            console.log('Configuration loaded:', config);
+                        } catch (error) {
+                            console.error('Failed to load configuration:', error);
                         }
                     },
                     connectWebSocket() {
@@ -555,12 +567,35 @@
                             default: return 'text-gray-400';
                         }
                     },
-                    updatePacketDropConfig() {
-                        this.ws.send(JSON.stringify({
-                            type: 'packet_drop_config',
-                            enabled: this.packetDropConfig.enabled,
-                            dropRate: this.packetDropConfig.dropRate
-                        }));
+                    async updatePacketDropConfig() {
+                        try {
+                            const requestBody = {
+                                packetDrop: {
+                                    enabled: this.packetDropConfig.enabled,
+                                    dropRate: this.packetDropConfig.dropRate
+                                }
+                            };
+                            
+                            console.log('Sending config update:', requestBody);
+                            console.log('dropRate type:', typeof requestBody.packetDrop.dropRate);
+                            
+                            const response = await fetch('/api/config', {
+                                method: 'PUT',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify(requestBody)
+                            });
+                            
+                            if (response.ok) {
+                                console.log('Packet drop configuration updated successfully');
+                            } else {
+                                const errorText = await response.text();
+                                console.error('Failed to update packet drop configuration:', response.status, errorText);
+                            }
+                        } catch (error) {
+                            console.error('Error updating packet drop configuration:', error);
+                        }
                     },
                     
                     // Video stream handling

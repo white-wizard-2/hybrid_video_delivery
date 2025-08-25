@@ -305,10 +305,23 @@ func (s *Server) getConfig(c *gin.Context) {
 
 func (s *Server) updateConfig(c *gin.Context) {
 	var config common.GlobalConfig
+
+	// Try to bind JSON and log any errors
 	if err := c.ShouldBindJSON(&config); err != nil {
+		log.Printf("Error binding JSON: %v", err)
+		log.Printf("Request Content-Type: %s", c.GetHeader("Content-Type"))
+		log.Printf("Request body length: %d", c.Request.ContentLength)
+
+		// Try to read the raw body for debugging
+		if body, readErr := c.GetRawData(); readErr == nil {
+			log.Printf("Raw request body: %s", string(body))
+		}
+
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	log.Printf("Successfully parsed config: %+v", config)
 
 	s.mu.Lock()
 	s.globalConfig = config
