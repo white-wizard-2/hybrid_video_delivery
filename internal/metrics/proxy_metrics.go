@@ -20,6 +20,7 @@ type ProxyMetricsTracker struct {
 
 	// FEC and fallback tracking
 	fecFailures      uint64
+	fecSuccesses     uint64 // Track successful FEC recoveries
 	unicastFallbacks uint64
 }
 
@@ -61,6 +62,13 @@ func (pmt *ProxyMetricsTracker) RecordFLUTESession() {
 func (pmt *ProxyMetricsTracker) RecordFECFailure() {
 	pmt.unicastMutex.Lock()
 	pmt.fecFailures++
+	pmt.unicastMutex.Unlock()
+}
+
+// RecordFECSuccess records a successful FEC recovery
+func (pmt *ProxyMetricsTracker) RecordFECSuccess() {
+	pmt.unicastMutex.Lock()
+	pmt.fecSuccesses++
 	pmt.unicastMutex.Unlock()
 }
 
@@ -143,6 +151,7 @@ func (pmt *ProxyMetricsTracker) GetFLUTEStats() map[string]interface{} {
 		"unicastBytes":      pmt.unicastBytes,
 		"broadcastBytes":    pmt.broadcastBytes,
 		"fecFailures":       pmt.fecFailures,
+		"fecSuccesses":      pmt.fecSuccesses, // Add FEC success count
 		"unicastFallbacks":  pmt.unicastFallbacks,
 	}
 }

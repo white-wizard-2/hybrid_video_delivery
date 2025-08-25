@@ -175,7 +175,35 @@ func (cs *CMAFStream) GetNextChunk() (*CMAFChunk, error) {
 	// Update chunk start time to current time for live streaming
 	chunk.StartTime = time.Now()
 
+	// Write chunk to origin folder for tracking
+	cs.writeChunkToFile(chunk, "origin")
+
 	return chunk, nil
+}
+
+// writeChunkToFile writes a chunk to the specified output folder
+func (cs *CMAFStream) writeChunkToFile(chunk *CMAFChunk, outputType string) {
+	outputDir := fmt.Sprintf("%s_output", outputType)
+	if outputType == "origin" {
+		outputDir = "origin"
+	}
+
+	// Create output directory if it doesn't exist
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		log.Printf("Failed to create output directory %s: %v", outputDir, err)
+		return
+	}
+
+	// Create filename with timestamp and chunk info
+	timestamp := time.Now().Format("20060102_150405_000")
+	filename := fmt.Sprintf("%s/chunk_%s_%s_%d.m4s", outputDir, timestamp, chunk.ID[:8], chunk.Size)
+
+	// Write chunk data to file
+	if err := os.WriteFile(filename, chunk.Data, 0644); err != nil {
+		log.Printf("Failed to write chunk to %s: %v", filename, err)
+	} else {
+		log.Printf("Wrote chunk %s to %s (size: %d bytes)", chunk.ID[:8], filename, chunk.Size)
+	}
 }
 
 // GetChunkByIndex returns a specific chunk by index

@@ -22,9 +22,11 @@ type Server struct {
 	router        *gin.Engine
 	upgrader      websocket.Upgrader
 	clients       map[*websocket.Conn]bool
-	clientsMutex  sync.RWMutex
 	clientMutexes map[*websocket.Conn]*sync.Mutex
+	clientsMutex  sync.RWMutex
 	logChan       chan common.LogEntry
+	mu            sync.RWMutex
+	globalConfig  common.GlobalConfig
 }
 
 func NewServer(cdnService *cdn.CDNService, proxyService *proxy.ProxyService) *Server {
@@ -82,6 +84,10 @@ func (s *Server) setupRoutes() {
 
 		// Comparison routes
 		api.GET("/comparison", s.getComparison)
+
+		// Configuration routes
+		api.GET("/config", s.getConfig)
+		api.PUT("/config", s.updateConfig)
 	}
 
 	// WebSocket for real-time logs
@@ -281,6 +287,30 @@ func (s *Server) getComparison(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, comparison)
+}
+
+func (s *Server) getConfig(c *gin.Context) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	c.JSON(http.StatusOK, s.globalConfig)
+}
+
+func (s *Server) updateConfig(c *gin.Context) {
+	var config common.GlobalConfig
+	if err := c.ShouldBindJSON(&config); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	s.mu.Lock()
+	s.globalConfig = config
+	s.mu.Unlock()
+
+	// Update services with new configuration
+	s.cdnService.UpdateConfig(config)
+	s.proxyService.UpdateConfig(config)
+
+	c.JSON(http.StatusOK, gin.H{"message": "Configuration updated successfully"})
 }
 
 // CMAF Manifest Handlers

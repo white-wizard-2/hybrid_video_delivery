@@ -78,3 +78,14 @@ type VideoChunk struct {
 	Sequence  int
 	Timestamp time.Time
 }
+
+// PacketDropConfig holds configuration for packet drop simulation
+type PacketDropConfig struct {
+	Enabled  bool    `json:"enabled"`
+	DropRate float64 `json:"dropRate"` // Percentage (0-100)
+}
+
+// GlobalConfig holds global configuration for the demo
+type GlobalConfig struct {
+	PacketDrop PacketDropConfig `json:"packetDrop"`
+}

@@ -110,29 +110,65 @@ func (mt *MetricsTracker) GetLatency() float64 {
 	return result
 }
 
-// GetBandwidth returns the current bandwidth in Mbps
+// GetBandwidth returns bandwidth in Mbps using a rolling window
 func (mt *MetricsTracker) GetBandwidth() float64 {
 	mt.mu.RLock()
 	defer mt.mu.RUnlock()
 
-	if mt.lastUpdateTime.Equal(mt.startTime) {
+	// Use a rolling window of the last 5 seconds for bandwidth calculation
+	windowDuration := 5 * time.Second
+	now := time.Now()
+	windowStart := now.Add(-windowDuration)
+
+	// Calculate bytes transferred in the last window
+	var windowBytes uint64
+	var windowCount int
+
+	// Count recent chunk deliveries within the window
+	for i := len(mt.chunkSizes) - 1; i >= 0 && i >= len(mt.chunkSizes)-20; i-- {
+		// Estimate time based on position (more recent = higher index)
+		estimatedTime := mt.lastUpdateTime.Add(-time.Duration(len(mt.chunkSizes)-1-i) * 300 * time.Millisecond)
+		if estimatedTime.After(windowStart) {
+			windowBytes += uint64(mt.chunkSizes[i])
+			windowCount++
+		}
+	}
+
+	// If we don't have enough recent data, use a simple rate calculation
+	if windowCount == 0 {
+		// Calculate rate based on recent activity
+		if len(mt.chunkSizes) > 0 {
+			// Use the last few chunks to estimate current rate
+			recentChunks := 10
+			if len(mt.chunkSizes) < 10 {
+				recentChunks = len(mt.chunkSizes)
+			}
+			for i := len(mt.chunkSizes) - int(recentChunks); i < len(mt.chunkSizes); i++ {
+				windowBytes += uint64(mt.chunkSizes[i])
+			}
+			// Estimate time for recent chunks (300ms per chunk)
+			estimatedTime := time.Duration(recentChunks) * 300 * time.Millisecond
+			bytesPerSecond := float64(windowBytes) / estimatedTime.Seconds()
+			mbps := (bytesPerSecond * 8) / (1024 * 1024)
+			return min(mbps, 1000) // Cap at 1 Gbps
+		}
 		return 0.0
 	}
 
-	duration := mt.lastUpdateTime.Sub(mt.startTime).Seconds()
-	if duration == 0 {
-		return 0.0
-	}
-
-	// Convert bytes to Mbps
-	bytesPerSecond := float64(mt.bytesTransferred) / duration
+	// Calculate bandwidth over the window
+	bytesPerSecond := float64(windowBytes) / windowDuration.Seconds()
 	mbps := (bytesPerSecond * 8) / (1024 * 1024) // Convert to Mbps
 
-	// Debug logging (commented out for production)
-	// fmt.Printf("DEBUG: Bandwidth - bytes: %d, duration: %.2fs, bytes/sec: %.2f, mbps: %.2f\n",
-	// 	mt.bytesTransferred, duration, bytesPerSecond, mbps)
+	// Cap the bandwidth to prevent unrealistic values
+	return min(mbps, 1000) // Cap at 1 Gbps
+}
 
-	return mbps
+// min returns the minimum of two float64 values
+func min(a, b float64) float64 {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // GetPacketLoss returns the packet loss percentage

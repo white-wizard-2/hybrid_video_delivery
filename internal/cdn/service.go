@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"os"
 	"sync"
 	"time"
 
@@ -28,6 +29,7 @@ type CDNService struct {
 	cancel  context.CancelFunc
 	logChan chan common.LogEntry
 	metrics *metrics.MetricsTracker
+	config  common.GlobalConfig
 }
 
 func NewService() *CDNService {
@@ -63,7 +65,7 @@ func (s *CDNService) AddNode() string {
 	nodeID := fmt.Sprintf("cdn-node-%d", len(s.nodes)+1)
 
 	// Use CMAF-CTE chunking for video streaming
-	stream := cmaf.NewCMAFStream(nodeID, "./sample.mp4", 2*time.Second, "avc1.640028", 100, true)
+	stream := cmaf.NewCMAFStream(nodeID, "./sample.mp4", 1*time.Second, "avc1.640028", 200, true) // Match Proxy: 200 Mbps
 	err := stream.Initialize()
 	if err != nil {
 		log.Printf("Failed to initialize CMAF stream for %s: %v", nodeID, err)
@@ -149,7 +151,7 @@ func (s *CDNService) simulateVideoStreaming(client *common.Client) {
 	}
 
 	// Use chunk duration for ticker
-	ticker := time.NewTicker(500 * time.Millisecond) // 500ms chunks for better metrics
+	ticker := time.NewTicker(300 * time.Millisecond) // Match Proxy: 300ms chunks
 	defer ticker.Stop()
 
 	chunkCount := 0
@@ -173,26 +175,18 @@ func (s *CDNService) simulateVideoStreaming(client *common.Client) {
 				continue
 			}
 
-			// Simulate realistic network latency (CDN: 20-80ms)
-			networkLatency := time.Duration(20+rand.Intn(60)) * time.Millisecond
+			// Simulate realistic network latency (CDN: 20-50ms)
+			networkLatency := time.Duration(20+rand.Intn(30)) * time.Millisecond
 			time.Sleep(networkLatency) // Simulate network delay
 			deliveryTime := time.Since(chunkStartTime)
 
-			// Record metrics for real calculations
-			s.metrics.RecordChunkDelivery(chunk.Size, deliveryTime)
-			s.metrics.RecordSuccessfulPacket()
+			// Check for packet drop simulation
+			s.mu.RLock()
+			packetDropEnabled := s.config.PacketDrop.Enabled
+			dropRate := s.config.PacketDrop.DropRate
+			s.mu.RUnlock()
 
-			// Real CDN streaming with CMAF-CTE chunks
-			s.logChan <- common.LogEntry{
-				Timestamp: time.Now(),
-				Level:     "DEBUG",
-				Service:   "CDN",
-				Message: fmt.Sprintf("CDN streaming CMAF chunk %d (ID: %s, size: %d bytes, duration: %s, latency: %.2fms) to client %s (CMAF-CTE)",
-					chunkCount, chunk.ID[:8], chunk.Size, chunk.Duration, deliveryTime.Milliseconds(), client.ID),
-			}
-
-			// Simulate occasional packet loss (lower than proxy)
-			if chunkCount%5 == 0 { // More frequent packet loss for testing
+			if packetDropEnabled && rand.Float64()*100 < dropRate {
 				s.metrics.RecordPacketLoss()
 				s.logChan <- common.LogEntry{
 					Timestamp: time.Now(),
@@ -200,6 +194,23 @@ func (s *CDNService) simulateVideoStreaming(client *common.Client) {
 					Service:   "CDN",
 					Message:   fmt.Sprintf("CDN packet loss detected for client %s (chunk %d)", client.ID, chunkCount),
 				}
+				continue // Skip this chunk delivery
+			}
+
+			// Record metrics for real calculations
+			s.metrics.RecordChunkDelivery(chunk.Size, deliveryTime)
+			s.metrics.RecordSuccessfulPacket()
+
+			// Write chunk to CDN output folder
+			s.writeChunkToOutput(chunk, "cdn")
+
+			// Log successful delivery
+			s.logChan <- common.LogEntry{
+				Timestamp: time.Now(),
+				Level:     "DEBUG",
+				Service:   "CDN",
+				Message: fmt.Sprintf("CDN delivered CMAF chunk %d (ID: %s, size: %d bytes, latency: %.2fms) to client %s",
+					chunkCount, chunk.ID[:8], chunk.Size, deliveryTime.Milliseconds(), client.ID),
 			}
 		}
 	}
@@ -259,5 +270,37 @@ func (s *CDNService) GetStats() common.ServiceStats {
 		TotalChunks:  totalChunks,
 		AvgChunkSize: avgChunkSize,
 		RecoveryRate: recoveryRate,
+	}
+}
+
+// UpdateConfig updates the service configuration
+func (s *CDNService) UpdateConfig(config common.GlobalConfig) {
+	s.mu.Lock()
+	s.config = config
+	s.mu.Unlock()
+
+	log.Printf("CDN Service: Configuration updated - Packet Drop Enabled: %v, Drop Rate: %.2f%%",
+		config.PacketDrop.Enabled, config.PacketDrop.DropRate)
+}
+
+// writeChunkToOutput writes a chunk to the CDN output folder
+func (s *CDNService) writeChunkToOutput(chunk *cmaf.CMAFChunk, outputType string) {
+	outputDir := fmt.Sprintf("%s_output", outputType)
+
+	// Create output directory if it doesn't exist
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		log.Printf("Failed to create output directory %s: %v", outputDir, err)
+		return
+	}
+
+	// Create filename with timestamp and chunk info
+	timestamp := time.Now().Format("20060102_150405_000")
+	filename := fmt.Sprintf("%s/chunk_%s_%s_%d.m4s", outputDir, timestamp, chunk.ID[:8], chunk.Size)
+
+	// Write chunk data to file
+	if err := os.WriteFile(filename, chunk.Data, 0644); err != nil {
+		log.Printf("Failed to write chunk to %s: %v", filename, err)
+	} else {
+		log.Printf("CDN wrote chunk %s to %s (size: %d bytes)", chunk.ID[:8], filename, chunk.Size)
 	}
 }
