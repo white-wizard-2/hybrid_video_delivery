@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vue.js Simple Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
+</head>
+<body>
+    <div id="app">
+        <h1>{{ message }}</h1>
+        <button @click="addNode">Add Node</button>
+        <div v-if="nodes.length > 0">
+            <h2>Nodes:</h2>
+            <ul>
+                <li v-for="node in nodes" :key="node">{{ node }}</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        console.log('Script starting...');
+        console.log('Vue available:', typeof Vue !== 'undefined');
+        
+        if (typeof Vue === 'undefined') {
+            console.error('Vue.js is not loaded!');
+            document.body.innerHTML = '<h1>Vue.js failed to load!</h1>';
+        } else {
+            console.log('Vue.js loaded successfully');
+            
+            const { createApp } = Vue;
+            
+            createApp({
+                data() {
+                    return {
+                        message: 'Vue.js is working!',
+                        nodes: []
+                    }
+                },
+                mounted() {
+                    console.log('Vue app mounted');
+                },
+                methods: {
+                    addNode() {
+                        this.nodes.push(`Node ${this.nodes.length + 1}`);
+                        console.log('Node added:', this.nodes);
+                    }
+                }
+            }).mount('#app');
+        }
+    </script>
+</body>
+</html>

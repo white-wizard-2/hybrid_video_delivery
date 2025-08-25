@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vue.js Test</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-button { background: blue; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
+        .test-button:hover { background: darkblue; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <h1>{{ message }}</h1>
+        <p>If you see "Hello Vue!" above, Vue.js is working correctly.</p>
+        <button @click="addNode" class="test-button">Add Test Node</button>
+        <div v-if="nodes.length > 0">
+            <h3>Nodes:</h3>
+            <ul>
+                <li v-for="node in nodes" :key="node">{{ node }}</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+        
+        createApp({
+            data() {
+                return {
+                    message: 'Hello Vue!',
+                    nodes: []
+                }
+            },
+            methods: {
+                addNode() {
+                    this.nodes.push(`Node ${this.nodes.length + 1}`);
+                }
+            },
+            mounted() {
+                console.log('Vue.js test application mounted successfully');
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
