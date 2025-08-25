@@ -17,6 +17,10 @@ type ProxyMetricsTracker struct {
 	// FLUTE multicast tracking
 	multicastSessions uint64
 	flutePackets      uint64
+
+	// FEC and fallback tracking
+	fecFailures      uint64
+	unicastFallbacks uint64
 }
 
 // NewProxyMetricsTracker creates a new proxy metrics tracker
@@ -50,6 +54,20 @@ func (pmt *ProxyMetricsTracker) RecordBroadcastDelivery(chunkSize int, deliveryT
 func (pmt *ProxyMetricsTracker) RecordFLUTESession() {
 	pmt.unicastMutex.Lock()
 	pmt.multicastSessions++
+	pmt.unicastMutex.Unlock()
+}
+
+// RecordFECFailure records a FEC failure that triggered unicast fallback
+func (pmt *ProxyMetricsTracker) RecordFECFailure() {
+	pmt.unicastMutex.Lock()
+	pmt.fecFailures++
+	pmt.unicastMutex.Unlock()
+}
+
+// RecordUnicastFallback records a unicast fallback delivery
+func (pmt *ProxyMetricsTracker) RecordUnicastFallback() {
+	pmt.unicastMutex.Lock()
+	pmt.unicastFallbacks++
 	pmt.unicastMutex.Unlock()
 }
 
@@ -124,6 +142,8 @@ func (pmt *ProxyMetricsTracker) GetFLUTEStats() map[string]interface{} {
 		"flutePackets":      pmt.flutePackets,
 		"unicastBytes":      pmt.unicastBytes,
 		"broadcastBytes":    pmt.broadcastBytes,
+		"fecFailures":       pmt.fecFailures,
+		"unicastFallbacks":  pmt.unicastFallbacks,
 	}
 }
 
@@ -136,5 +156,7 @@ func (pmt *ProxyMetricsTracker) Reset() {
 	pmt.broadcastBytes = 0
 	pmt.multicastSessions = 0
 	pmt.flutePackets = 0
+	pmt.fecFailures = 0
+	pmt.unicastFallbacks = 0
 	pmt.unicastMutex.Unlock()
 }

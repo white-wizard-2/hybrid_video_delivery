@@ -232,12 +232,17 @@ func (s *ProxyService) simulate5GBroadcast(client *common.Client, node *ProxyNod
 						Message:   fmt.Sprintf("Raptor FEC successfully recovered lost packet for client %s", client.ID),
 					}
 				} else {
+					// FEC failed - fallback to unicast delivery
+					s.metrics.RecordFECFailure()
 					s.logChan <- common.LogEntry{
 						Timestamp: time.Now(),
 						Level:     "ERROR",
 						Service:   "PROXY",
-						Message:   fmt.Sprintf("Raptor FEC failed to recover packet for client %s", client.ID),
+						Message:   fmt.Sprintf("Raptor FEC failed to recover packet for client %s, falling back to unicast", client.ID),
 					}
+
+					// Simulate unicast fallback delivery
+					go s.simulateUnicastFallback(client, node, chunk, chunkCount)
 				}
 			}
 
@@ -252,6 +257,28 @@ func (s *ProxyService) simulate5GBroadcast(client *common.Client, node *ProxyNod
 				}
 			}
 		}
+	}
+}
+
+// simulateUnicastFallback simulates unicast delivery when FEC fails
+func (s *ProxyService) simulateUnicastFallback(client *common.Client, node *ProxyNode, chunk *cmaf.CMAFChunk, chunkCount int) {
+	// Simulate unicast network latency (higher than multicast)
+	unicastLatency := time.Duration(10+rand.Intn(40)) * time.Millisecond // 10-50ms for unicast
+	time.Sleep(unicastLatency)
+
+	// Record unicast delivery metrics
+	deliveryTime := unicastLatency
+	s.metrics.RecordUnicastDelivery(chunk.Size, deliveryTime)
+	s.metrics.RecordUnicastFallback()
+	s.metrics.RecordSuccessfulPacket()
+
+	// Log the unicast fallback delivery
+	s.logChan <- common.LogEntry{
+		Timestamp: time.Now(),
+		Level:     "INFO",
+		Service:   "PROXY",
+		Message: fmt.Sprintf("Unicast fallback delivery: chunk %d (ID: %s, size: %d bytes, latency: %.2fms) to client %s via unicast",
+			chunkCount, chunk.ID[:8], chunk.Size, deliveryTime.Milliseconds(), client.ID),
 	}
 }
 
